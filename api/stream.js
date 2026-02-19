@@ -1,12 +1,17 @@
-export default async function handler(req, res) {
+export const config = {
+  runtime: "edge",
+};
+
+export default async function handler(req) {
   try {
-    const { url } = req.query;
+    const { searchParams } = new URL(req.url);
+    const url = searchParams.get("url");
 
     if (!url) {
-      return res.status(400).send("URL is required");
+      return new Response("URL is required", { status: 400 });
     }
 
-    const range = req.headers.range;
+    const range = req.headers.get("range");
 
     const headers = {
       "User-Agent": "Mozilla/5.0",
@@ -16,39 +21,33 @@ export default async function handler(req, res) {
       headers["Range"] = range;
     }
 
-    const response = await fetch(url, {
-      headers,
-    });
+    const response = await fetch(url, { headers });
 
-    // Ambil info dari server asal
+    // Ambil header penting
     const contentType = response.headers.get("content-type") || "audio/mpeg";
     const contentLength = response.headers.get("content-length");
-    const acceptRanges = response.headers.get("accept-ranges");
+    const contentRange = response.headers.get("content-range");
 
-    // Set header ke client
-    res.setHeader("Content-Type", contentType);
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Accept-Ranges", "bytes");
-    res.setHeader("Content-Disposition", "inline");
+    const newHeaders = new Headers();
+    newHeaders.set("Content-Type", contentType);
+    newHeaders.set("Access-Control-Allow-Origin", "*");
+    newHeaders.set("Accept-Ranges", "bytes");
+    newHeaders.set("Content-Disposition", "inline");
 
     if (contentLength) {
-      res.setHeader("Content-Length", contentLength);
+      newHeaders.set("Content-Length", contentLength);
     }
 
-    if (response.status === 206) {
-      res.status(206);
-      const contentRange = response.headers.get("content-range");
-      if (contentRange) {
-        res.setHeader("Content-Range", contentRange);
-      }
-    } else {
-      res.status(200);
+    if (contentRange) {
+      newHeaders.set("Content-Range", contentRange);
     }
 
-    // Stream data
-    response.body.pipe(res);
+    return new Response(response.body, {
+      status: response.status,
+      headers: newHeaders,
+    });
 
   } catch (err) {
-    res.status(500).send("Proxy error: " + err.message);
+    return new Response("Proxy error: " + err.message, { status: 500 });
   }
 }
