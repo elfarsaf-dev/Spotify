@@ -1,23 +1,43 @@
 export default async function handler(req, res) {
-
-  const { link } = req.query;
-
-  if (!link) {
-    return res.status(400).json({ error: "missing link" });
-  }
+  const { q, link } = req.query;
 
   try {
+    // ============================
+    // SEARCH (NEXRAY)
+    // ============================
+    if (q) {
+      const api =
+        "https://api.nexray.web.id/search/spotify?q=" +
+        encodeURIComponent(q);
 
-    const api =
-      "https://api.ferdev.my.id/downloader/spotify?link="
-      + encodeURIComponent(link)
-      + "&apikey=key-elfs";
+      const response = await fetch(api);
+      const data = await response.json();
 
-    const response = await fetch(api);
-    const data = await response.json();
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return res.status(200).json(data);
+    }
 
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    return res.status(200).json(data);
+    // ============================
+    // DOWNLOAD (NEXRAY)
+    // ============================
+    if (link) {
+      const api =
+        "https://api.nexray.web.id/downloader/spotify?url=" +
+        encodeURIComponent(link);
+
+      const response = await fetch(api);
+      const data = await response.json();
+
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return res.status(200).json(data);
+    }
+
+    // ============================
+    // ERROR
+    // ============================
+    return res.status(400).json({
+      error: "gunakan ?q= untuk search atau ?link= untuk download"
+    });
 
   } catch (err) {
     return res.status(500).json({ error: "proxy error" });
